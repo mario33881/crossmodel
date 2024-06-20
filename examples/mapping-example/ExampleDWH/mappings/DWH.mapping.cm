@@ -28,14 +28,17 @@ mapping:
         entity: CompleteCustomer
         mappings:
           - attribute: Name
-            source: Customer.FirstName
-          - attribute: Name
-            source: Customer.LastName
+            sources:
+              - Customer.FirstName
+              - Customer.LastName
+            expression: "CONCAT_WS({{Customer.FirstName}}, {{Customer.LastName}}, ' ')"
           - attribute: Country
-            source: Country.Name
+            sources:
+              - Country.Name
           - attribute: Age
-            source: CalcAgeSourceObject.Age
+            sources:
+              - CalcAgeSourceObject.Age
           - attribute: FixedNumber
-            source: 1337
+            expression: "1337"
           - attribute: FixedString
-            source: "Fixed String"
+            expression: "Fixed String"

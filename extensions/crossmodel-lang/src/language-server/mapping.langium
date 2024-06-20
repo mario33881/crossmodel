@@ -49,7 +49,7 @@ RelationshipCondition:
 ;
 
 JoinCondition:
-    'join' ':' expression=JoinExpression
+    'join' ':' join=JoinExpression
 ;
 
 JoinExpression:
@@ -69,14 +69,18 @@ TargetObject:
 
 AttributeMapping:
     'attribute' ':' attribute=AttributeMappingTarget
-    'source' ':' source=AttributeMappingSource
+    ('sources' ':' 
+        INDENT 
+            ('-' sources+=AttributeMappingSource)+     
+        DEDENT
+    )?
+    ('expression' ':' expression=STRING)?
 ;
 
 AttributeMappingTarget:
-    value=[TargetObjectAttribute:IDReference];
+    value=[TargetObjectAttribute:IDReference]
+;
 
 AttributeMappingSource:
-    {infer ReferenceSource} value=[SourceObjectAttribute:IDReference] |
-    {infer NumberLiteral} value=NUMBER |
-    {infer StringLiteral} value=STRING
+    value=[SourceObjectAttribute:IDReference]
 ;

@@ -2,7 +2,6 @@
  * Copyright (c) 2023 CrossBreeze.
  ********************************************************************************/
 
-import { quote } from '@crossbreeze/protocol';
 import { isReference } from 'langium';
 import { Serializer } from '../model-server/serializer.js';
 import {
@@ -16,10 +15,7 @@ import {
    SystemDiagram,
    isAttributeMappingSource,
    isAttributeMappingTarget,
-   isJoinExpression,
-   isNumberLiteral,
-   isReferenceSource,
-   isStringLiteral
+   isJoinExpression
 } from './generated/ast.js';
 import { isImplicitProperty } from './util/ast-util.js';
 
@@ -42,15 +38,16 @@ const PROPERTY_ORDER = [
    'relationship',
    'sourceNode',
    'targetNode',
+   'attribute',
    'sources',
    'target',
    'object',
    'join',
    'relations',
    'mappings',
-   'attribute',
    'source',
-   'conditions'
+   'conditions',
+   'expression'
 ];
 
 const ID_OR_IDREF = [
@@ -61,6 +58,7 @@ const ID_OR_IDREF = [
    'targetNode',
    'object',
    'source',
+   'sources',
    'target',
    'attribute',
    'from',
@@ -71,7 +69,7 @@ const ID_OR_IDREF = [
 ];
 
 /** Mapping from JavaScript property keys (AST) to YAML property keys (Grammar). */
-const PROPERTY_TO_KEY_MAP = new Map([['expression', 'join']]);
+const PROPERTY_TO_KEY_MAP = new Map();
 
 /**
  * Hand-written AST serializer as there is currently no out-of-the box serializer from Langium, but it is on the roadmap.
@@ -137,17 +135,18 @@ export class CrossModelSerializer implements Serializer<CrossModelRoot> {
    private serializeArray(arr: any[], indentationLevel: number, key: string): string {
       const serializedItems = arr
          .map(item => this.serializeValue(item, indentationLevel, key))
-         .map(item => this.changeCharInString(item, indentationLevel + CrossModelSerializer.INDENTATION_AMOUNT_ARRAY, '-'))
+         .map(item => this.ensureArrayItem(item, indentationLevel + CrossModelSerializer.INDENTATION_AMOUNT_ARRAY))
          .join(CrossModelSerializer.CHAR_NEWLINE);
       return serializedItems;
    }
 
-   private changeCharInString(inputString: string, indexToChange: number, newChar: any): string {
-      if (indexToChange < 0 || indexToChange >= inputString.length) {
-         throw Error('invalid');
+   private ensureArrayItem(input: any, indentationLevel: number): string {
+      if (indentationLevel < 0) {
+         return input;
       }
 
-      const modifiedString = inputString.slice(0, indexToChange) + newChar + inputString.slice(indexToChange + 1);
+      const indentation = CrossModelSerializer.CHAR_INDENTATION.repeat(indentationLevel);
+      const modifiedString = indentation + '- ' + input.toString().trimStart();
       return modifiedString;
    }
 
@@ -199,16 +198,7 @@ export class CrossModelSerializer implements Serializer<CrossModelRoot> {
    }
 
    private serializeAttributeMappingSource(obj: AttributeMappingSource): any {
-      if (isReferenceSource(obj)) {
-         return this.resolvedValue(obj.value);
-      }
-      if (isNumberLiteral(obj)) {
-         return obj.value;
-      }
-      if (isStringLiteral(obj)) {
-         return quote(obj.value);
-      }
-      return '';
+      return this.resolvedValue(obj.value);
    }
 
    private serializeAttributeMappingTarget(obj: AttributeMappingTarget): any {

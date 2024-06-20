@@ -3,10 +3,12 @@
  ********************************************************************************/
 
 import { ModelService, ModelServiceClient } from '@crossbreeze/model-service/lib/common';
-import { CrossModelRoot } from '@crossbreeze/protocol';
+import { CrossModelRoot, RenderProps } from '@crossbreeze/protocol';
 import {
    EntityComponent,
    ErrorView,
+   MappingComponent,
+   MappingRenderProps,
    ModelProviderProps,
    OpenCallback,
    RelationshipComponent,
@@ -64,7 +66,7 @@ export class CrossModelWidget extends ReactWidget implements Saveable {
       this.autoSaveDelay = this.editorPreferences.get('files.autoSaveDelay');
 
       this.toDispose.pushAll([
-         this.serviceClient.onUpdate(event => {
+         this.serviceClient.onModelUpdate(event => {
             if (event.sourceClientId !== this.options.clientId && event.uri === this.model?.uri.toString()) {
                this.handleExternalUpdate(event.model);
             }
@@ -208,6 +210,7 @@ export class CrossModelWidget extends ReactWidget implements Saveable {
                onModelOpen={this.handleOpenRequest}
                modelQueryApi={this.modelService}
                theme={this.themeService.getCurrentTheme().type}
+               {...this.getRenderProperties(this.model.root)}
             />
          );
       }
@@ -221,13 +224,35 @@ export class CrossModelWidget extends ReactWidget implements Saveable {
                onModelOpen={this.handleOpenRequest}
                modelQueryApi={this.modelService}
                theme={this.themeService.getCurrentTheme().type}
+               {...this.getRenderProperties(this.model.root)}
             />
          );
+      }
+      if (this.model?.root?.mapping) {
+         const renderProps = this.getRenderProperties(this.model.root) as unknown as MappingRenderProps;
+         if (renderProps?.mappingIndex >= 0) {
+            return (
+               <MappingComponent
+                  dirty={this.dirty}
+                  model={this.model.root}
+                  onModelUpdate={this.handleUpdateRequest}
+                  onModelSave={this.handleSaveRequest}
+                  onModelOpen={this.handleOpenRequest}
+                  modelQueryApi={this.modelService}
+                  theme={this.themeService.getCurrentTheme().type}
+                  {...renderProps}
+               />
+            );
+         }
       }
       if (this.error) {
          return <ErrorView errorMessage={this.error} />;
       }
       return <div className='theia-widget-noInfo'>No properties available.</div>;
+   }
+
+   protected getRenderProperties(root: CrossModelRoot): RenderProps {
+      return {};
    }
 
    protected focusInput(): void {

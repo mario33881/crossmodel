@@ -18,14 +18,6 @@ export const CrossModelTerminals = {
     ID: /[_a-zA-Z][\w_\-~$#@/\d]*/,
 };
 
-export type AttributeMappingSource = NumberLiteral | ReferenceSource | StringLiteral;
-
-export const AttributeMappingSource = 'AttributeMappingSource';
-
-export function isAttributeMappingSource(item: unknown): item is AttributeMappingSource {
-    return reflection.isInstance(item, AttributeMappingSource);
-}
-
 export type IDReference = string;
 
 export function isIDReference(item: unknown): item is IDReference {
@@ -64,13 +56,26 @@ export interface AttributeMapping extends AstNode {
     readonly $container: TargetObject;
     readonly $type: 'AttributeMapping';
     attribute: AttributeMappingTarget
-    source: AttributeMappingSource
+    expression?: string
+    sources: Array<AttributeMappingSource>
 }
 
 export const AttributeMapping = 'AttributeMapping';
 
 export function isAttributeMapping(item: unknown): item is AttributeMapping {
     return reflection.isInstance(item, AttributeMapping);
+}
+
+export interface AttributeMappingSource extends AstNode {
+    readonly $container: AttributeMapping;
+    readonly $type: 'AttributeMappingSource';
+    value: Reference<SourceObjectAttribute>
+}
+
+export const AttributeMappingSource = 'AttributeMappingSource';
+
+export function isAttributeMappingSource(item: unknown): item is AttributeMappingSource {
+    return reflection.isInstance(item, AttributeMappingSource);
 }
 
 export interface AttributeMappingTarget extends AstNode {
@@ -136,7 +141,7 @@ export function isEntityNode(item: unknown): item is EntityNode {
 export interface JoinCondition extends AstNode {
     readonly $container: SourceObjectRelations;
     readonly $type: 'JoinCondition';
-    expression: JoinExpression
+    join: JoinExpression
 }
 
 export const JoinCondition = 'JoinCondition';
@@ -171,30 +176,6 @@ export const Mapping = 'Mapping';
 
 export function isMapping(item: unknown): item is Mapping {
     return reflection.isInstance(item, Mapping);
-}
-
-export interface NumberLiteral extends AstNode {
-    readonly $container: AttributeMapping;
-    readonly $type: 'NumberLiteral';
-    value: number
-}
-
-export const NumberLiteral = 'NumberLiteral';
-
-export function isNumberLiteral(item: unknown): item is NumberLiteral {
-    return reflection.isInstance(item, NumberLiteral);
-}
-
-export interface ReferenceSource extends AstNode {
-    readonly $container: AttributeMapping;
-    readonly $type: 'ReferenceSource';
-    value: Reference<SourceObjectAttribute>
-}
-
-export const ReferenceSource = 'ReferenceSource';
-
-export function isReferenceSource(item: unknown): item is ReferenceSource {
-    return reflection.isInstance(item, ReferenceSource);
 }
 
 export interface Relationship extends AstNode {
@@ -283,18 +264,6 @@ export function isSourceObjectRelations(item: unknown): item is SourceObjectRela
     return reflection.isInstance(item, SourceObjectRelations);
 }
 
-export interface StringLiteral extends AstNode {
-    readonly $container: AttributeMapping;
-    readonly $type: 'StringLiteral';
-    value: string
-}
-
-export const StringLiteral = 'StringLiteral';
-
-export function isStringLiteral(item: unknown): item is StringLiteral {
-    return reflection.isInstance(item, StringLiteral);
-}
-
 export interface SystemDiagram extends AstNode {
     readonly $container: CrossModelRoot;
     readonly $type: 'SystemDiagram';
@@ -377,8 +346,6 @@ export type CrossModelAstType = {
     JoinCondition: JoinCondition
     JoinExpression: JoinExpression
     Mapping: Mapping
-    NumberLiteral: NumberLiteral
-    ReferenceSource: ReferenceSource
     Relationship: Relationship
     RelationshipAttribute: RelationshipAttribute
     RelationshipCondition: RelationshipCondition
@@ -387,7 +354,6 @@ export type CrossModelAstType = {
     SourceObjectAttribute: SourceObjectAttribute
     SourceObjectCondition: SourceObjectCondition
     SourceObjectRelations: SourceObjectRelations
-    StringLiteral: StringLiteral
     SystemDiagram: SystemDiagram
     TargetObject: TargetObject
     TargetObjectAttribute: TargetObjectAttribute
@@ -396,7 +362,7 @@ export type CrossModelAstType = {
 export class CrossModelAstReflection extends AbstractAstReflection {
 
     getAllTypes(): string[] {
-        return ['Attribute', 'AttributeMapping', 'AttributeMappingSource', 'AttributeMappingTarget', 'CrossModelRoot', 'Entity', 'EntityAttribute', 'EntityNode', 'EntityNodeAttribute', 'JoinCondition', 'JoinExpression', 'Mapping', 'NumberLiteral', 'ReferenceSource', 'Relationship', 'RelationshipAttribute', 'RelationshipCondition', 'RelationshipEdge', 'SourceObject', 'SourceObjectAttribute', 'SourceObjectCondition', 'SourceObjectRelations', 'StringLiteral', 'SystemDiagram', 'TargetObject', 'TargetObjectAttribute'];
+        return ['Attribute', 'AttributeMapping', 'AttributeMappingSource', 'AttributeMappingTarget', 'CrossModelRoot', 'Entity', 'EntityAttribute', 'EntityNode', 'EntityNodeAttribute', 'JoinCondition', 'JoinExpression', 'Mapping', 'Relationship', 'RelationshipAttribute', 'RelationshipCondition', 'RelationshipEdge', 'SourceObject', 'SourceObjectAttribute', 'SourceObjectCondition', 'SourceObjectRelations', 'SystemDiagram', 'TargetObject', 'TargetObjectAttribute'];
     }
 
     protected override computeIsSubtype(subtype: string, supertype: string): boolean {
@@ -413,11 +379,6 @@ export class CrossModelAstReflection extends AbstractAstReflection {
             case RelationshipCondition: {
                 return this.isSubtype(SourceObjectCondition, supertype);
             }
-            case NumberLiteral:
-            case ReferenceSource:
-            case StringLiteral: {
-                return this.isSubtype(AttributeMappingSource, supertype);
-            }
             default: {
                 return false;
             }
@@ -427,6 +388,11 @@ export class CrossModelAstReflection extends AbstractAstReflection {
     getReferenceType(refInfo: ReferenceInfo): string {
         const referenceId = `${refInfo.container.$type}:${refInfo.property}`;
         switch (referenceId) {
+            case 'AttributeMappingSource:value':
+            case 'JoinExpression:source':
+            case 'JoinExpression:target': {
+                return SourceObjectAttribute;
+            }
             case 'AttributeMappingTarget:value': {
                 return TargetObjectAttribute;
             }
@@ -436,11 +402,6 @@ export class CrossModelAstReflection extends AbstractAstReflection {
             case 'SourceObject:entity':
             case 'TargetObject:entity': {
                 return Entity;
-            }
-            case 'JoinExpression:source':
-            case 'JoinExpression:target':
-            case 'ReferenceSource:value': {
-                return SourceObjectAttribute;
             }
             case 'RelationshipAttribute:child':
             case 'RelationshipAttribute:parent': {
@@ -465,6 +426,14 @@ export class CrossModelAstReflection extends AbstractAstReflection {
 
     getTypeMetaData(type: string): TypeMetaData {
         switch (type) {
+            case 'AttributeMapping': {
+                return {
+                    name: 'AttributeMapping',
+                    mandatory: [
+                        { name: 'sources', type: 'array' }
+                    ]
+                };
+            }
             case 'Entity': {
                 return {
                     name: 'Entity',

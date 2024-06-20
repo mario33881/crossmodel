@@ -2,9 +2,9 @@
  * Copyright (c) 2023 CrossBreeze.
  ********************************************************************************/
 import { ModelService } from '@crossbreeze/model-service/lib/common';
-import { MappingType, ModelFileExtensions, TargetObjectType, quote, toId } from '@crossbreeze/protocol';
+import { MappingType, ModelFileExtensions, ModelStructure, TargetObjectType, quote, toId } from '@crossbreeze/protocol';
 import { Command, CommandContribution, CommandRegistry, MaybePromise, MenuContribution, MenuModelRegistry, URI, nls } from '@theia/core';
-import { CommonMenus, DialogError, codicon, open } from '@theia/core/lib/browser';
+import { CommonMenus, DialogError, open } from '@theia/core/lib/browser';
 import { TabBarToolbarRegistry } from '@theia/core/lib/browser/shell/tab-bar-toolbar';
 import { inject, injectable } from '@theia/core/shared/inversify';
 import { EditorContextMenu } from '@theia/editor/lib/browser';
@@ -12,6 +12,7 @@ import { FileStat } from '@theia/filesystem/lib/common/files';
 import { FileNavigatorContribution, NavigatorContextMenu } from '@theia/navigator/lib/browser/navigator-contribution';
 import { WorkspaceCommandContribution } from '@theia/workspace/lib/browser/workspace-commands';
 import { WorkspaceInputDialog } from '@theia/workspace/lib/browser/workspace-input-dialog';
+import * as yaml from 'yaml';
 
 const NEW_ELEMENT_NAV_MENU = [...NavigatorContextMenu.NAVIGATION, '0_new'];
 const NEW_ELEMENT_MAIN_MENU = [...CommonMenus.FILE, '0_new'];
@@ -52,7 +53,7 @@ const NEW_ELEMENT_TEMPLATES: NewElementTemplate[] = [
       label: 'Entity',
       fileExtension: ModelFileExtensions.Entity,
       category: TEMPLATE_CATEGORY,
-      iconClass: codicon('git-commit'),
+      iconClass: ModelStructure.Entity.ICON,
       content: name => INITIAL_ENTITY_CONTENT.replace(/\$\{name\}/gi, quote(name)).replace(/\$\{id\}/gi, toId(name))
    },
    {
@@ -60,7 +61,7 @@ const NEW_ELEMENT_TEMPLATES: NewElementTemplate[] = [
       label: 'Relationship',
       fileExtension: ModelFileExtensions.Relationship,
       category: TEMPLATE_CATEGORY,
-      iconClass: codicon('git-compare'),
+      iconClass: ModelStructure.Relationship.ICON,
       content: name => INITIAL_RELATIONSHIP_CONTENT.replace(/\$\{name\}/gi, quote(name)).replace(/\$\{id\}/gi, toId(name))
    },
    {
@@ -68,7 +69,7 @@ const NEW_ELEMENT_TEMPLATES: NewElementTemplate[] = [
       label: 'SystemDiagram',
       fileExtension: ModelFileExtensions.SystemDiagram,
       category: TEMPLATE_CATEGORY,
-      iconClass: codicon('type-hierarchy-sub'),
+      iconClass: ModelStructure.SystemDiagram.ICON,
       content: name => INITIAL_DIAGRAM_CONTENT.replace(/\$\{name\}/gi, quote(name)).replace(/\$\{id\}/gi, toId(name))
    },
    {
@@ -76,7 +77,7 @@ const NEW_ELEMENT_TEMPLATES: NewElementTemplate[] = [
       label: 'Mapping',
       fileExtension: ModelFileExtensions.Mapping,
       category: TEMPLATE_CATEGORY,
-      iconClass: codicon('group-by-ref-type'),
+      iconClass: ModelStructure.Mapping.ICON,
       content: name => INITIAL_MAPPING_CONTENT.replace(/\$\{name\}/gi, quote(name)).replace(/\$\{id\}/gi, toId(name))
    }
 ];
@@ -172,11 +173,23 @@ export class CrossModelWorkspaceContribution extends WorkspaceCommandContributio
                return;
             }
 
+            const root = await this.modelService.request(entityElement.uri);
+            if (!root?.entity) {
+               this.messageService.error('Could not resolve entity element at ' + entityUri.path.fsPath());
+               return;
+            }
             const mappingName = baseFileName.charAt(0).toUpperCase() + baseFileName.substring(1);
-            const content = `mapping:
-            id: ${mappingName}
-            target:
-               entity: ${entityElement.label}`;
+            const mapping = {
+               mapping: {
+                  id: mappingName,
+                  target: {
+                     entity: entityElement.label,
+                     mappings: [] as { attribute: string }[]
+                  }
+               }
+            };
+            root.entity.attributes.forEach(attribute => mapping.mapping.target.mappings.push({ attribute: attribute.id }));
+            const content = yaml.stringify(mapping, { indent: 4 });
             await this.fileService.create(mappingUri, content);
             this.fireCreateNewFile({ parent: parentUri, uri: mappingUri });
             open(this.openerService, mappingUri);
